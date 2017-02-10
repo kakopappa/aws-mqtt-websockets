@@ -19,21 +19,17 @@
 #include <Countdown.h>
 #include <MQTTClient.h>
 
-
-
-//AWS MQTT Websocket
+//MQTT Websocket
 #include "Client.h"
-#include "AWSWebSocketClient.h"
+#include "AMQWebSocketClient.h"
 #include "CircularByteBuffer.h"
 
 //AWS IOT config, change these:
 char wifi_ssid[]       = "your-ssid";
 char wifi_password[]   = "your-password";
-char aws_endpoint[]    = "your-endpoint.iot.eu-west-1.amazonaws.com";
-char aws_key[]         = "your-iam-key";
-char aws_secret[]      = "your-iam-secret-key";
-char aws_region[]      = "eu-west-1";
-const char* aws_topic  = "$aws/things/your-device/shadow/update";
+const char* amq_topic  = "/things/your-device";
+char amq_endpoint[]    = "iot.com";
+
 int port = 443;
 
 //MQTT config
@@ -42,9 +38,9 @@ const int maxMQTTMessageHandlers = 1;
 
 ESP8266WiFiMulti WiFiMulti;
 
-AWSWebSocketClient awsWSclient(1000);
+AMQWebSocketClient amqWSclient(1000);
 
-IPStack ipstack(awsWSclient);
+IPStack ipstack(amqWSclient);
 MQTT::Client<IPStack, Countdown, maxMQTTpackageSize, maxMQTTMessageHandlers> *client = NULL;
 
 //# of connections
@@ -97,7 +93,6 @@ bool connect () {
       client = new MQTT::Client<IPStack, Countdown, maxMQTTpackageSize, maxMQTTMessageHandlers>(ipstack);
     }
 
-
     //delay is not necessary... it just help us to get a "trustful" heap space value
     delay (1000);
     Serial.print (millis ());
@@ -107,10 +102,8 @@ bool connect () {
     Serial.print (ESP.getFreeHeap ());
     Serial.println (")");
 
-
-
-
-   int rc = ipstack.connect(aws_endpoint, port);
+ 
+   int rc = ipstack.connect(amq_endpoint, port);
     if (rc != 1)
     {
       Serial.println("error connection to the websocket server");
@@ -118,7 +111,6 @@ bool connect () {
     } else {
       Serial.println("websocket layer connected");
     }
-
 
     Serial.println("MQTT connecting");
     MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
@@ -140,7 +132,7 @@ bool connect () {
 //subscribe to a mqtt topic
 void subscribe () {
    //subscript to a topic
-    int rc = client->subscribe(aws_topic, MQTT::QOS0, messageArrived);
+    int rc = client->subscribe(amq_topic, MQTT::QOS0, messageArrived);
     if (rc != 0) {
       Serial.print("rc from MQTT subscribe is ");
       Serial.println(rc);
@@ -160,7 +152,7 @@ void sendmessage () {
     message.dup = false;
     message.payload = (void*)buf;
     message.payloadlen = strlen(buf)+1;
-    int rc = client->publish(aws_topic, message); 
+    int rc = client->publish(amq_topic, message); 
 }
 
 
@@ -178,11 +170,9 @@ void setup() {
     }
     Serial.println ("\nconnected");
 
-    //fill AWS parameters    
-    awsWSclient.setAWSRegion(aws_region);
-    awsWSclient.setAWSDomain(aws_endpoint);
-    awsWSclient.setAWSKeyID(aws_key);
-    awsWSclient.setAWSSecretKey(aws_secret);
+    //fill AWS parameters
+    const char* canonicalUri = "/mqtt";
+    awsWSclient.setPath(canonicalUri);    
     awsWSclient.setUseSSL(true);
 
     if (connect ()){
